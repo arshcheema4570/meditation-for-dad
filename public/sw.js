@@ -1,7 +1,8 @@
-const CACHE = 'meditation-shell-v6'; // bump on every release: the shell (index.html) is cache-first, so a stale cache would keep serving the old page (and its deleted hashed asset)
-// Cache API buckets the Kokoro voice keeps its downloaded files in — never
-// delete these on SW update, or the ~137 MB model would re-download every release.
-const KEEP = new Set([CACHE, 'transformers-cache', 'kokoro-voices']);
+const CACHE = 'meditation-shell-v7'; // bump on every release: the shell (index.html) is cache-first, so a stale cache would keep serving the old page (and its deleted hashed asset)
+// Only the current shell cache is kept. The old voice-model cache buckets
+// are deliberately NOT kept: the voice model they held was removed, so
+// deleting them on activate frees ~137 MB from device caches.
+const KEEP = new Set([CACHE]);
 const SHELL = ['./', './index.html', './manifest.json', './icons/icon.svg'];
 
 self.addEventListener('install', (event) => {

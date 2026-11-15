@@ -19,16 +19,10 @@ const STR = {
     complete: '✓ Complete — ', minutes: ' minutes. Well done.',
     breatheIn: 'Breathe in', hold: 'Hold', breatheOut: 'Breathe out', ready: 'ready',
     preparingPhonon: 'Preparing natural voice…',
-    preparingKokoro: 'Preparing Kokoro voice…',
     phononReady: (n) => `Natural voice ready · ${n} voices · offline from now on`,
-    kokoroReady: 'Kokoro voice ready · offline from now on',
     phononUnavailable: 'Natural voice unavailable — using device voice.',
-    kokoroUnavailable: 'Kokoro voice unavailable — using device voice.',
     downloadFailed: 'Download failed — check connection and retry. (Needs HTTPS or localhost.)',
     loadPhononFirst: 'Load the natural voice first',
-    loadKokoroFirst: 'Load the Kokoro voice first',
-    kokoroDownload: 'Download Kokoro voice',
-    kokoroStatus: 'One-time download (~137 MB), then offline forever.',
     phononDownload: 'Download natural voice',
     phononStatus: 'One-time download (~35 MB), then offline forever.',
     downloading: 'Downloading…', tryAgain: 'Try again',
@@ -50,16 +44,10 @@ const STR = {
     complete: '✓ पूरा हुआ — ', minutes: ' मिनट। बहुत अच्छा।',
     breatheIn: 'साँस अंदर', hold: 'रुकें', breatheOut: 'साँस बाहर', ready: 'तैयार',
     preparingPhonon: 'नेचुरल आवाज़ तैयार हो रही है…',
-    preparingKokoro: 'Kokoro आवाज़ तैयार हो रही है…',
     phononReady: (n) => `नेचुरल आवाज़ तैयार · ${n} आवाज़ें · अब से ऑफ़लाइन`,
-    kokoroReady: 'Kokoro आवाज़ तैयार · अब से ऑफ़लाइन',
     phononUnavailable: 'नेचुरल आवाज़ उपलब्ध नहीं — डिवाइस आवाज़ इस्तेमाल हो रही है।',
-    kokoroUnavailable: 'Kokoro आवाज़ उपलब्ध नहीं — डिवाइस आवाज़ इस्तेमाल हो रही है।',
     downloadFailed: 'डाउनलोड नहीं हुआ — कनेक्शन जाँचें और फिर कोशिश करें। (HTTPS या localhost चाहिए।)',
     loadPhononFirst: 'पहले नेचुरल आवाज़ लोड करें',
-    loadKokoroFirst: 'पहले Kokoro आवाज़ लोड करें',
-    kokoroDownload: 'Kokoro आवाज़ डाउनलोड करें',
-    kokoroStatus: 'एक बार डाउनलोड (~137 MB), फिर हमेशा ऑफ़लाइन।',
     phononDownload: 'नेचुरल आवाज़ डाउनलोड करें',
     phononStatus: 'एक बार डाउनलोड (~35 MB), फिर हमेशा ऑफ़लाइन।',
     downloading: 'डाउनलोड हो रहा है…', tryAgain: 'फिर कोशिश करें',
@@ -102,26 +90,16 @@ document.querySelectorAll('#langSeg button').forEach((b) => {
 
 /* ================= TTS ================= */
 let voices = [], voiceIdx = 0, ttsRate = 0.95;
-// 'kokoro' = Kokoro-82M, the default voice for both languages · 'phonon' = Phonon 31M, English-only alternate · 'device' = built-in TTS, last resort only
-let engine = localStorage.getItem('meditation.engine') || 'kokoro';
-if (!['kokoro', 'phonon', 'device'].includes(engine)) engine = 'kokoro';
+// 'phonon' = Phonon 31M, the default English voice · 'device' = built-in TTS.
+// Hindi always uses the device voice (hi-IN): Phonon is English-only.
+let engine = localStorage.getItem('meditation.engine') || 'phonon';
+if (!['phonon', 'device'].includes(engine)) engine = 'phonon'; // old installs stored a different engine name; anything else falls back to Phonon
 let tts = null, phononVoice = null;
-let kokoro = null, kokoroLoading = null, kokoroFailed = false;
-let kokoroVoice = localStorage.getItem('meditation.kokoroVoice') || '';
-const KOKORO_VOICES = {
-  en: ['af_heart', 'af_bella', 'af_nicole', 'am_adam', 'am_michael'],
-  hi: ['hf_alpha', 'hf_beta', 'hm_omega', 'hm_psi'],
-};
-const kokoroDefaultVoice = () => (lang === 'hi' ? 'hf_alpha' : 'af_heart');
-function kokoroVoiceFor() {
-  const list = KOKORO_VOICES[lang];
-  return list.includes(kokoroVoice) ? kokoroVoice : kokoroDefaultVoice();
-}
 let phononAudio = null, phononGain = null;
 let activeSources = [];
 let lastEnd = 0;
 
-function effectiveEngine() { return lang === 'hi' ? 'kokoro' : engine; } // Phonon is English-only
+function effectiveEngine() { return lang === 'hi' ? 'device' : engine; } // Phonon is English-only, so Hindi uses the native device voice
 
 function loadVoices() {
   const prefix = lang === 'hi' ? 'hi' : 'en';
@@ -133,7 +111,11 @@ function loadVoices() {
     o.value = i; o.textContent = v.name + ' (' + v.lang + ')'; pick.appendChild(o);
   });
   if (voiceIdx >= voices.length) voiceIdx = 0;
-  const d = voices.findIndex((v) => v.default); if (d >= 0) { pick.value = d; voiceIdx = d; }
+  // Prefer the system default voice; otherwise the exact locale (hi-IN / en-US).
+  const d = voices.findIndex((v) => v.default);
+  const exact = voices.findIndex((v) => v.lang.toLowerCase() === (lang === 'hi' ? 'hi-in' : 'en-us'));
+  const best = d >= 0 ? d : exact >= 0 ? exact : 0;
+  pick.value = best; voiceIdx = best;
   pick.disabled = false;
 }
 if ('speechSynthesis' in window) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
@@ -142,16 +124,7 @@ $('rateIn').oninput = (e) => { ttsRate = parseFloat(e.target.value) || 0.95; };
 function populateVoicePick() {
   const pick = $('voicePick'); pick.innerHTML = '';
   const eff = effectiveEngine();
-  if (eff === 'kokoro') {
-    if (!kokoro) { pick.innerHTML = '<option>' + t('loadKokoroFirst') + '</option>'; pick.disabled = true; }
-    else {
-      KOKORO_VOICES[lang].forEach((v) => {
-        const o = document.createElement('option');
-        o.value = v; o.textContent = v + (v === kokoroDefaultVoice() ? ' ★' : ''); pick.appendChild(o);
-      });
-      pick.value = kokoroVoiceFor(); pick.disabled = false;
-    }
-  } else if (eff === 'phonon') {
+  if (eff === 'phonon') {
     if (tts) {
       tts.voices.forEach((v) => { const o = document.createElement('option'); o.value = v; o.textContent = v; pick.appendChild(o); });
       pick.value = phononVoice; pick.disabled = false;
@@ -161,8 +134,7 @@ function populateVoicePick() {
   }
   pick.onchange = () => {
     const e2 = effectiveEngine();
-    if (e2 === 'kokoro') { kokoroVoice = pick.value; localStorage.setItem('meditation.kokoroVoice', kokoroVoice); }
-    else if (e2 === 'phonon') phononVoice = pick.value;
+    if (e2 === 'phonon') phononVoice = pick.value;
     else voiceIdx = +pick.value;
   };
 }
@@ -174,7 +146,6 @@ function setEngine(e, silent) {
   document.querySelectorAll('#engineSeg button').forEach((x) => x.classList.toggle('on', x.dataset.eng === eff));
   const phBtn = document.querySelector('#engineSeg button[data-eng="phonon"]');
   if (phBtn) { phBtn.disabled = lang === 'hi'; phBtn.title = lang === 'hi' ? t('phononOnlyEn') : ''; }
-  $('kokoroRow').style.display = eff === 'kokoro' ? '' : 'none';
   $('phononRow').style.display = eff === 'phonon' ? '' : 'none';
   populateVoicePick();
   if (!silent) { /* voice pick refreshes via populateVoicePick */ }
@@ -191,75 +162,6 @@ function ensureAudio() {
     if (phononAudio.state === 'suspended') phononAudio.resume();
   } catch (e) {}
 }
-
-// Patched Hindi-capable Kokoro bundle, vendored same-origin (stock kokoro-js
-// cannot speak Hindi: its Hindi voices are commented out and its phonemizer is
-// English-only). Loaded lazily as a separate module — NOT bundled by Vite — so
-// its importmap ('espeak-ng') and its import.meta.url-relative worker file
-// (vendor/kokoro/ort.bundle.min.mjs) resolve correctly.
-let kokoroModule = null;
-async function getKokoroModule() {
-  if (kokoroModule) return kokoroModule;
-  const url = new URL('vendor/kokoro/kokoro-hindi.web.js', document.baseURI).href;
-  kokoroModule = await import(url);
-  return kokoroModule;
-}
-
-async function loadKokoro(explicit = false) {
-  if (kokoro) return kokoro;
-  if (kokoroLoading) return kokoroLoading;
-  // A failed load must NOT be retried silently on every sentence (speak()
-  // calls this per sentence): that flickered the status line between
-  // 'ready' and 'failed' and re-threw instantly each time. Only an explicit
-  // user retry (the Try again button) starts a fresh attempt.
-  if (kokoroFailed && !explicit) return null;
-  if (explicit) kokoroFailed = false;
-  ensureAudio(); // user gesture: unlock audio now
-  const btn = $('kokoroBtn'), st = $('kokoroStatus');
-  const say = (x) => { st.textContent = x; if (!$('player').hidden) $('plStep').textContent = x; };
-  if (btn) { btn.disabled = true; btn.textContent = t('downloading'); }
-  say(t('preparingKokoro'));
-  kokoroLoading = (async () => {
-    try {
-      // Model + voices vendored under models/ — no Hugging Face fetch at runtime.
-      const { KokoroTTS, env, setVoiceDataUrl } = await getKokoroModule();
-      env.allowLocalModels = true;    // browser default is false
-      env.allowRemoteModels = false;  // a missing local file throws instead of fetching from HF
-      // ABSOLUTE url (not './vendor/ort/'): the bundle dynamic-imports the
-      // ORT jsep module with a RELATIVE specifier, which resolves against the
-      // BUNDLE's own url (vendor/kokoro/) — a relative wasmPaths made it look
-      // for vendor/kokoro/vendor/ort/ort-wasm-simd-threaded.jsep.mjs (404) and
-      // the load failed instantly. An absolute base resolves correctly.
-      env.wasmPaths = new URL('./vendor/ort/', document.baseURI).href;
-      setVoiceDataUrl('./models/Kokoro-82M-v1.0-ONNX/voices'); // no trailing slash
-      kokoro = await KokoroTTS.from_pretrained('./models/Kokoro-82M-v1.0-ONNX', {
-        dtype: 'q8', device: 'wasm',
-        progress_callback: (p) => {
-          if (p.status === 'progress' || p.status === 'downloading') {
-            const pct = p.total ? Math.round((p.loaded / p.total) * 100) : null;
-            say(pct != null ? `${t('preparingKokoro')} ${pct}%` : `${t('preparingKokoro')} ${Math.round((p.loaded || 0) / 1048576)} MB`);
-          }
-          // NOTE: p.status === 'done' fires PER FILE (config.json finishes
-          // first) — it does NOT mean the voice is ready. 'Ready' is only
-          // shown after from_pretrained resolves below.
-        },
-      });
-      if (btn) btn.textContent = 'Kokoro voice ready ✓';
-      say(t('kokoroReady'));
-      populateVoicePick();
-      return kokoro;
-    } catch (e) {
-      console.error('Kokoro load failed', e);
-      kokoroLoading = null;
-      kokoroFailed = true;
-      if (btn) { btn.disabled = false; btn.textContent = t('tryAgain'); }
-      say(t('downloadFailed'));
-      return null;
-    }
-  })();
-  return kokoroLoading;
-}
-$('kokoroBtn').onclick = () => loadKokoro(true); // explicit retry only
 
 async function loadPhonon() {
   if (tts) return;
@@ -328,36 +230,12 @@ async function speakPhononPart(part, run) {
   await csleep(waitMs + 250, run);
 }
 
-async function speakKokoroPart(part, run) {
-  ensureAudio();
-  const k = await loadKokoro();
-  if (!k || run.cancelled) return speakDevice(part);
-  try {
-    const audio = await k.generate(part, { voice: kokoroVoiceFor() });
-    if (run.cancelled) return;
-    const buf = phononAudio.createBuffer(1, audio.audio.length, audio.sampling_rate);
-    buf.getChannelData(0).set(audio.audio);
-    const src = phononAudio.createBufferSource();
-    src.buffer = buf; src.playbackRate.value = ttsRate; src.connect(phononGain);
-    activeSources.push(src);
-    const ended = new Promise((res) => { src.onended = () => res(); });
-    const startAt = Math.max(phononAudio.currentTime, lastEnd);
-    src.start(startAt);
-    lastEnd = startAt + buf.duration / ttsRate;
-    await Promise.race([ended, csleep((buf.duration / ttsRate) * 1000 + 500, run)]);
-    if (run.cancelled) { try { src.stop(); } catch (e) {} }
-  } catch (e) {
-    if (!run.cancelled) { console.error('Kokoro speak failed, falling back to device voice', e); return speakDevice(part); }
-  }
-}
-
 async function speak(text, run) {
   const eff = effectiveEngine();
   for (const part of splitSentences(text)) {
     if (run.cancelled) break;
     try {
-      if (eff === 'kokoro') await speakKokoroPart(part, run);
-      else if (eff === 'phonon' && tts) await speakPhononPart(part, run);
+      if (eff === 'phonon' && tts) await speakPhononPart(part, run);
       else await speakDevice(part);
     } catch (e) { if (!run.cancelled) console.error('speak failed', e); }
   }
@@ -625,12 +503,7 @@ async function startMeditation(raw) {
   $('breathWrap').hidden = true;
   const eff = effectiveEngine();
   ensureAudio(); // user gesture: unlock audio
-  if (eff === 'kokoro' && !kokoro) {
-    $('plStep').textContent = t('preparingKokoro');
-    await loadKokoro(); // one-time download; speak() falls back to device TTS if it fails
-    if (run.cancelled) return;
-    if (!kokoro) $('plStep').textContent = t('kokoroUnavailable');
-  } else if (eff === 'phonon' && !tts) {
+  if (eff === 'phonon' && !tts) {
     $('plStep').textContent = t('preparingPhonon');
     await loadPhonon(); // one-time download; speak() falls back to device TTS if it fails
     if (run.cancelled) return;
