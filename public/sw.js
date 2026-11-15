@@ -1,4 +1,4 @@
-const CACHE = 'mind-gym-shell-v3';
+const CACHE = 'mind-gym-shell-v4';
 const SHELL = ['./', './index.html', './manifest.json', './icons/icon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -12,7 +12,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin) return; // Phonon weights (huggingface.co) use their own Cache API store
+  if (url.origin !== self.location.origin) return; // Kokoro + Phonon weights (huggingface.co) use their own Cache API store
   event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
     const copy = response.clone();
     caches.open(CACHE).then((cache) => cache.put(event.request, copy));

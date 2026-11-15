@@ -3,47 +3,55 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b0c0f">
-<title>Mind Gym — offline meditation + brain training</title>
+<meta name="theme-color" content="#ffffff">
+<title>Meditation for Dad — offline guided meditation</title>
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
-  <script type="module" crossorigin src="./assets/index-BdrV-PPJ.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-BlqSWTtm.css">
+  <script type="module" crossorigin src="./assets/index-B3whaxIb.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CW0yc60j.css">
 </head>
 <body>
 <header>
   <div class="brand">
     <img src="./icons/icon.svg" alt="" width="28" height="28">
-    <div><h1>Mind Gym</h1><p>offline meditation + brain training</p></div>
+    <div><h1>Meditation for Dad</h1><p data-i18n="subtitle">offline guided meditation</p></div>
+  </div>
+  <div class="seg" id="langSeg" role="group" aria-label="Language">
+    <button data-lang="en" class="on">English</button>
+    <button data-lang="hi">हिन्दी</button>
   </div>
   <div class="streak" title="Consecutive active days">🔥 <b id="streakN">0</b></div>
 </header>
 
 <nav id="tabs">
-  <button data-tab="meditate" class="on">🧘 Meditate</button>
-  <button data-tab="train">🧠 Train</button>
-  <button data-tab="progress">📊 Progress</button>
-  <button data-tab="why">❓ Why it works</button>
+  <button data-tab="meditate" class="on" data-i18n="meditate">🧘 Meditate</button>
+  <button data-tab="progress" data-i18n="progress">📊 Progress</button>
+  <button data-tab="why" data-i18n="why">❓ Why it works</button>
 </nav>
 
 <main>
   <!-- MEDITATE -->
   <section id="tab-meditate" class="tab on">
     <div id="sessList"></div>
-    <div class="center"><button class="linklike" id="voiceSettingsBtn">⚙︎ Voice settings</button></div>
+    <div class="center"><button class="linklike" id="voiceSettingsBtn" data-i18n="voiceSettings">⚙︎ Voice settings</button></div>
     <div class="card" id="voiceCard" hidden>
       <div class="row">
         <div class="seg" id="engineSeg">
-          <button data-eng="phonon" class="on">🎙 Natural</button>
+          <button data-eng="kokoro" class="on">🎙 Kokoro</button>
+          <button data-eng="phonon">🎙 Natural</button>
           <button data-eng="device">🔊 Device</button>
         </div>
-        <select id="voicePick" aria-label="Voice" disabled><option>Load the natural voice first</option></select>
-        <label class="mut">Rate <input id="rateIn" type="range" min="0.7" max="1.2" step="0.05" value="0.95"></label>
+        <select id="voicePick" aria-label="Voice" disabled><option>Load the Kokoro voice first</option></select>
+        <label class="mut"><span data-i18n="rate">Rate</span> <input id="rateIn" type="range" min="0.7" max="1.2" step="0.05" value="0.95"></label>
       </div>
-      <div class="row" id="phononRow">
-        <button class="btn sm" id="phononBtn">Download natural voice</button>
-        <span class="mut small" id="phononStatus">One-time download (~35 MB), then offline forever.</span>
+      <div class="row" id="kokoroRow">
+        <button class="btn sm" id="kokoroBtn" data-i18n="kokoroDownload">Download Kokoro voice</button>
+        <span class="mut small" id="kokoroStatus" data-i18n="kokoroStatus">One-time download (~92 MB), then offline forever.</span>
+      </div>
+      <div class="row" id="phononRow" style="display:none">
+        <button class="btn sm" id="phononBtn" data-i18n="phononDownload">Download natural voice</button>
+        <span class="mut small" id="phononStatus" data-i18n="phononStatus">One-time download (~35 MB), then offline forever.</span>
       </div>
     </div>
     <div id="player" class="card" hidden>
@@ -52,47 +60,27 @@
       <p id="plStep" class="mut"></p>
       <div class="pbar"><div id="plBar"></div></div>
       <div class="row center">
-        <button class="btn" id="plStop">⏹ Stop</button>
+        <button class="btn" id="plStop" data-i18n="stop">⏹ Stop</button>
       </div>
     </div>
-  </section>
-
-  <!-- TRAIN -->
-  <section id="tab-train" class="tab">
-    <div class="grid2">
-      <button class="game" data-g="nback"><span class="tile g-nback">🧠</span><b>N-Back</b><span>working memory</span><em class="gbest" id="gb-nback"></em></button>
-      <button class="game" data-g="stroop"><span class="tile g-stroop">🎯</span><b>Stroop</b><span>attention control</span><em class="gbest" id="gb-stroop"></em></button>
-      <button class="game" data-g="react"><span class="tile g-react">⚡</span><b>Reaction</b><span>processing speed</span><em class="gbest" id="gb-react"></em></button>
-      <button class="game" data-g="seq"><span class="tile g-seq">🔢</span><b>Sequence</b><span>short-term memory</span><em class="gbest" id="gb-seq"></em></button>
-    </div>
-    <div id="gameArea"></div>
   </section>
 
   <!-- PROGRESS -->
   <section id="tab-progress" class="tab">
     <div class="cards3">
-      <div class="stat"><b id="stMin">0</b><span>meditation min</span></div>
-      <div class="stat"><b id="stGames">0</b><span>training rounds</span></div>
-      <div class="stat"><b id="stStreak">0</b><span>day streak</span></div>
+      <div class="stat"><b id="stMin">0</b><span data-i18n="minLabel">meditation min</span></div>
+      <div class="stat"><b id="stStreak">0</b><span data-i18n="streakLabel">day streak</span></div>
+      <div class="stat"><b id="stSess">0</b><span data-i18n="sessLabel">sessions done</span></div>
     </div>
-    <h3 class="sect">Personal bests</h3>
-    <div class="cards3">
-      <div class="stat"><b id="bN">–</b><span>N-back level</span></div>
-      <div class="stat"><b id="bS">–</b><span>Stroop / 30s</span></div>
-      <div class="stat"><b id="bR">–</b><span>reaction ms</span></div>
-      <div class="stat"><b id="bQ">–</b><span>sequence</span></div>
-    </div>
-    <h3 class="sect">Last 7 days</h3>
+    <h3 class="sect" data-i18n="last7">Last 7 days</h3>
     <div id="weekBars" class="bars"></div>
   </section>
 
   <!-- WHY -->
   <section id="tab-why" class="tab">
-    <div class="card"><h3>N-Back → working memory</h3><p>The most-studied working-memory exercise in cognitive science. Regular practice is linked to gains on working-memory tasks.</p></div>
-    <div class="card"><h3>Stroop → attention control</h3><p>Naming ink colors while ignoring the word trains selective attention and mental flexibility — core executive functions.</p></div>
-    <div class="card"><h3>Mindfulness → stress &amp; focus</h3><p>Meta-analyses link regular mindfulness practice to lower perceived stress and better sustained attention.</p></div>
-    <div class="card"><h3>Slow breathing → calm physiology</h3><p>Extended exhales stimulate the vagus nerve and shift the nervous system toward rest — measurable within minutes.</p></div>
-    <p class="mut small">Honest note: brain-training gains are strongest on the trained skill itself. This app targets the exercises with the best evidence and tracks your numbers so you can see your own trend.</p>
+    <div class="card"><h3 data-i18n="whyMind">Mindfulness → stress &amp; focus</h3><p data-i18n="whyMindP">Meta-analyses link regular mindfulness practice to lower perceived stress and better sustained attention.</p></div>
+    <div class="card"><h3 data-i18n="whyBreath">Slow breathing → calm physiology</h3><p data-i18n="whyBreathP">Extended exhales stimulate the vagus nerve and shift the nervous system toward rest — measurable within minutes.</p></div>
+    <p class="mut small" data-i18n="whyNote">Sessions are short on purpose: a few minutes a day, done regularly, beats one long session a week.</p>
   </section>
 </main>
 
