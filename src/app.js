@@ -106,7 +106,7 @@ let voices = [], voiceIdx = 0, ttsRate = 0.95;
 let engine = localStorage.getItem('meditation.engine') || 'kokoro';
 if (!['kokoro', 'phonon', 'device'].includes(engine)) engine = 'kokoro';
 let tts = null, phononVoice = null;
-let kokoro = null, kokoroLoading = null;
+let kokoro = null, kokoroLoading = null, kokoroFailed = false;
 let kokoroVoice = localStorage.getItem('meditation.kokoroVoice') || '';
 const KOKORO_VOICES = {
   en: ['af_heart', 'af_bella', 'af_nicole', 'am_adam', 'am_michael'],
@@ -205,9 +205,15 @@ async function getKokoroModule() {
   return kokoroModule;
 }
 
-async function loadKokoro() {
+async function loadKokoro(explicit = false) {
   if (kokoro) return kokoro;
   if (kokoroLoading) return kokoroLoading;
+  // A failed load must NOT be retried silently on every sentence (speak()
+  // calls this per sentence): that flickered the status line between
+  // 'ready' and 'failed' and re-threw instantly each time. Only an explicit
+  // user retry (the Try again button) starts a fresh attempt.
+  if (kokoroFailed && !explicit) return null;
+  if (explicit) kokoroFailed = false;
   ensureAudio(); // user gesture: unlock audio now
   const btn = $('kokoroBtn'), st = $('kokoroStatus');
   const say = (x) => { st.textContent = x; if (!$('player').hidden) $('plStep').textContent = x; };
@@ -219,7 +225,12 @@ async function loadKokoro() {
       const { KokoroTTS, env, setVoiceDataUrl } = await getKokoroModule();
       env.allowLocalModels = true;    // browser default is false
       env.allowRemoteModels = false;  // a missing local file throws instead of fetching from HF
-      env.wasmPaths = './vendor/ort/'; // ORT wasm + jsep .mjs live here (trailing slash)
+      // ABSOLUTE url (not './vendor/ort/'): the bundle dynamic-imports the
+      // ORT jsep module with a RELATIVE specifier, which resolves against the
+      // BUNDLE's own url (vendor/kokoro/) — a relative wasmPaths made it look
+      // for vendor/kokoro/vendor/ort/ort-wasm-simd-threaded.jsep.mjs (404) and
+      // the load failed instantly. An absolute base resolves correctly.
+      env.wasmPaths = new URL('./vendor/ort/', document.baseURI).href;
       setVoiceDataUrl('./models/Kokoro-82M-v1.0-ONNX/voices'); // no trailing slash
       kokoro = await KokoroTTS.from_pretrained('./models/Kokoro-82M-v1.0-ONNX', {
         dtype: 'q8', device: 'wasm',
@@ -227,7 +238,10 @@ async function loadKokoro() {
           if (p.status === 'progress' || p.status === 'downloading') {
             const pct = p.total ? Math.round((p.loaded / p.total) * 100) : null;
             say(pct != null ? `${t('preparingKokoro')} ${pct}%` : `${t('preparingKokoro')} ${Math.round((p.loaded || 0) / 1048576)} MB`);
-          } else if (p.status === 'done') say(t('kokoroReady'));
+          }
+          // NOTE: p.status === 'done' fires PER FILE (config.json finishes
+          // first) — it does NOT mean the voice is ready. 'Ready' is only
+          // shown after from_pretrained resolves below.
         },
       });
       if (btn) btn.textContent = 'Kokoro voice ready ✓';
@@ -237,6 +251,7 @@ async function loadKokoro() {
     } catch (e) {
       console.error('Kokoro load failed', e);
       kokoroLoading = null;
+      kokoroFailed = true;
       if (btn) { btn.disabled = false; btn.textContent = t('tryAgain'); }
       say(t('downloadFailed'));
       return null;
@@ -244,7 +259,7 @@ async function loadKokoro() {
   })();
   return kokoroLoading;
 }
-$('kokoroBtn').onclick = loadKokoro;
+$('kokoroBtn').onclick = () => loadKokoro(true); // explicit retry only
 
 async function loadPhonon() {
   if (tts) return;
@@ -602,6 +617,7 @@ async function startMeditation(raw) {
   const sess = L(raw);
   const run = { cancelled: false, t0: Date.now(), abort: new AbortController() }; medRun = run;
   lastEnd = 0;
+  voiceCardWasOpen = !$('voiceCard').hidden; // restore it on stop (below)
   $('sessList').hidden = true; $('voiceCard').hidden = true; $('player').hidden = false;
   $('plTitle').textContent = sess.name;
   $('plStep').textContent = '';
@@ -622,11 +638,16 @@ async function startMeditation(raw) {
   }
   runSession(sess, run);
 }
+let voiceCardWasOpen = false; // remembered at session start, restored on stop
 function stopMeditation() {
+  const wasRunning = !!medRun;
   if (medRun) { medRun.cancelled = true; try { medRun.abort.abort(); } catch (e) {} }
   medRun = null; stopTTS();
   $('sessList').hidden = false; $('player').hidden = true;
   $('breathWrap').hidden = true;
+  // The voice settings used to vanish after every session (start hid the card,
+  // stop never restored it). Put it back how the user had it.
+  if (wasRunning) $('voiceCard').hidden = !voiceCardWasOpen;
 }
 $('plStop').onclick = stopMeditation;
 
