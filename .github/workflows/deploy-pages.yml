@@ -1,4 +1,4 @@
-name: Deploy Mind Gym to GitHub Pages
+name: Deploy Meditation for Dad
 
 on:
   push:
