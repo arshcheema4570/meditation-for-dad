@@ -1,5 +1,5 @@
-onlyBuiltDependencies:
-  - esbuild
-  - onnxruntime-node
-  - protobufjs
-  - sharp
+allowBuilds:
+  esbuild: true
+  onnxruntime-node: true
+  protobufjs: true
+  sharp: true
