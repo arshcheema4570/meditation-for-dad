@@ -1,7 +1,5 @@
 /* Meditation for Dad — offline guided meditation (English + Hindi). */
 import { PhononTTS } from 'phonon-tts';
-import { KokoroTTS } from 'kokoro-js';
-import { env } from '@huggingface/transformers';
 import './styles.css';
 
 const $ = (id) => document.getElementById(id);
@@ -19,7 +17,7 @@ const STR = {
     listening: 'Listening…', quiet: 'Quiet',
     breathingRound: (i, n) => `Breathing · round ${i} of ${n}`,
     complete: '✓ Complete — ', minutes: ' minutes. Well done.',
-    breatheIn: 'Breathe in', hold: 'Hold', breatheOut: 'Breathe out',
+    breatheIn: 'Breathe in', hold: 'Hold', breatheOut: 'Breathe out', ready: 'ready',
     preparingPhonon: 'Preparing natural voice…',
     preparingKokoro: 'Preparing Kokoro voice…',
     phononReady: (n) => `Natural voice ready · ${n} voices · offline from now on`,
@@ -30,7 +28,7 @@ const STR = {
     loadPhononFirst: 'Load the natural voice first',
     loadKokoroFirst: 'Load the Kokoro voice first',
     kokoroDownload: 'Download Kokoro voice',
-    kokoroStatus: 'One-time download (~92 MB), then offline forever.',
+    kokoroStatus: 'One-time download (~137 MB), then offline forever.',
     phononDownload: 'Download natural voice',
     phononStatus: 'One-time download (~35 MB), then offline forever.',
     downloading: 'Downloading…', tryAgain: 'Try again',
@@ -50,7 +48,7 @@ const STR = {
     listening: 'सुनिए…', quiet: 'शांत',
     breathingRound: (i, n) => `साँस · चक्र ${i} / ${n}`,
     complete: '✓ पूरा हुआ — ', minutes: ' मिनट। बहुत अच्छा।',
-    breatheIn: 'साँस अंदर', hold: 'रुकें', breatheOut: 'साँस बाहर',
+    breatheIn: 'साँस अंदर', hold: 'रुकें', breatheOut: 'साँस बाहर', ready: 'तैयार',
     preparingPhonon: 'नेचुरल आवाज़ तैयार हो रही है…',
     preparingKokoro: 'Kokoro आवाज़ तैयार हो रही है…',
     phononReady: (n) => `नेचुरल आवाज़ तैयार · ${n} आवाज़ें · अब से ऑफ़लाइन`,
@@ -61,7 +59,7 @@ const STR = {
     loadPhononFirst: 'पहले नेचुरल आवाज़ लोड करें',
     loadKokoroFirst: 'पहले Kokoro आवाज़ लोड करें',
     kokoroDownload: 'Kokoro आवाज़ डाउनलोड करें',
-    kokoroStatus: 'एक बार डाउनलोड (~92 MB), फिर हमेशा ऑफ़लाइन।',
+    kokoroStatus: 'एक बार डाउनलोड (~137 MB), फिर हमेशा ऑफ़लाइन।',
     phononDownload: 'नेचुरल आवाज़ डाउनलोड करें',
     phononStatus: 'एक बार डाउनलोड (~35 MB), फिर हमेशा ऑफ़लाइन।',
     downloading: 'डाउनलोड हो रहा है…', tryAgain: 'फिर कोशिश करें',
@@ -84,18 +82,22 @@ function applyLang() {
     const v = STR[lang][el.dataset.i18n];
     if (typeof v === 'string') el.textContent = v;
   });
+  $('breathLabel').textContent = t('ready');
   document.querySelectorAll('#langSeg button').forEach((b) => b.classList.toggle('on', b.dataset.lang === lang));
   setEngine(engine, true);
   renderSessions();
 }
 document.querySelectorAll('#langSeg button').forEach((b) => {
-  b.onclick = () => {
-    if (b.dataset.lang === lang) return;
+  b.addEventListener('click', (e) => {
+    e.preventDefault();
+    const next = b.dataset.lang;
+    if (next !== 'en' && next !== 'hi') return;
+    if (next === lang) return;
     stopMeditation();
-    lang = b.dataset.lang;
+    lang = next;
     localStorage.setItem('meditation.lang', lang);
-    applyLang();
-  };
+    applyLang(); // switches UI + session list synchronously, before any session can start
+  });
 });
 
 /* ================= TTS ================= */
@@ -190,6 +192,19 @@ function ensureAudio() {
   } catch (e) {}
 }
 
+// Patched Hindi-capable Kokoro bundle, vendored same-origin (stock kokoro-js
+// cannot speak Hindi: its Hindi voices are commented out and its phonemizer is
+// English-only). Loaded lazily as a separate module — NOT bundled by Vite — so
+// its importmap ('espeak-ng') and its import.meta.url-relative worker file
+// (vendor/kokoro/ort.bundle.min.mjs) resolve correctly.
+let kokoroModule = null;
+async function getKokoroModule() {
+  if (kokoroModule) return kokoroModule;
+  const url = new URL('vendor/kokoro/kokoro-hindi.web.js', document.baseURI).href;
+  kokoroModule = await import(url);
+  return kokoroModule;
+}
+
 async function loadKokoro() {
   if (kokoro) return kokoro;
   if (kokoroLoading) return kokoroLoading;
@@ -200,9 +215,13 @@ async function loadKokoro() {
   say(t('preparingKokoro'));
   kokoroLoading = (async () => {
     try {
-      // ONNX runtime wasm, vendored same-origin so Kokoro works offline after the first fetch.
-      if (env.backends?.onnx?.wasm) env.backends.onnx.wasm.wasmPaths = './vendor/onnx/';
-      kokoro = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', {
+      // Model + voices vendored under models/ — no Hugging Face fetch at runtime.
+      const { KokoroTTS, env, setVoiceDataUrl } = await getKokoroModule();
+      env.allowLocalModels = true;    // browser default is false
+      env.allowRemoteModels = false;  // a missing local file throws instead of fetching from HF
+      env.wasmPaths = './vendor/ort/'; // ORT wasm + jsep .mjs live here (trailing slash)
+      setVoiceDataUrl('./models/Kokoro-82M-v1.0-ONNX/voices'); // no trailing slash
+      kokoro = await KokoroTTS.from_pretrained('./models/Kokoro-82M-v1.0-ONNX', {
         dtype: 'q8', device: 'wasm',
         progress_callback: (p) => {
           if (p.status === 'progress' || p.status === 'downloading') {
